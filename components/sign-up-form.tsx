@@ -48,7 +48,34 @@ export function SignUpForm({
         },
       });
       if (error) throw error;
-      router.push("/auth/sign-up-success");
+      // Fetch the user profile and redirect based on role (with polling)
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (user) {
+        let profile = null;
+        let attempts = 0;
+        while (!profile && attempts < 10) {
+          const { data } = await supabase
+            .from("profiles")
+            .select("role")
+            .eq("id", user.id)
+            .single();
+          if (data?.role) {
+            profile = data;
+            break;
+          }
+          attempts++;
+          await new Promise((res) => setTimeout(res, 300)); // wait 300ms
+        }
+        if (profile?.role === "admin") {
+          router.push("/dashboard");
+        } else {
+          router.push("/");
+        }
+      } else {
+        router.push("/");
+      }
     } catch (error: unknown) {
       setError(error instanceof Error ? error.message : "An error occurred");
     } finally {
